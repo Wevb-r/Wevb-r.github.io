@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MicroHeat">
+<meta name="theme-color" content="#0f0d0c">
+<title>MicroHeat — Microwave Calculator</title>
+
+<!-- Inline web-app manifest (so "Add to Home Screen" gives a real app icon) -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"MicroHeat","short_name":"MicroHeat","start_url":".","display":"standalone","background_color":"%230f0d0c","theme_color":"%230f0d0c","description":"Accurate microwave heating times from real thermodynamics.","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 512 512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27112%27 fill=%27%23ff5a1f%27/%3E%3Ctext x=%2756%27 y=%27370%27 font-size=%27300%27 font-family=%27Arial%27%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
+
+<style>
+  :root{
+    --bg:#0f0d0c; --surface:#1a1715; --surface2:#232020; --line:#322c29;
+    --text:#f5efe9; --muted:#9a8f86; --accent:#ff5a1f; --accent2:#ff8a3d;
+    --good:#34d399; --warn:#fbbf24;
+    --safe:env(safe-area-inset-top);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    min-height:100vh; min-height:100dvh;
+    padding:calc(var(--safe) + 12px) 14px 32px;
+    max-width:520px; margin:0 auto;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app-header{text-align:center; margin:6px 0 18px}
+  .app-header .logo{font-size:30px; display:block; filter:saturate(1.1)}
+  .app-header h1{font-size:24px; margin:4px 0 0; letter-spacing:-0.5px}
+  .app-header p{color:var(--muted); font-size:12.5px; margin:3px 0 0}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:14px; margin-bottom:12px}
+  .card h2{font-size:12px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin:0 0 11px; font-weight:700}
+
+  .chip-row{display:flex; flex-wrap:wrap; gap:7px}
+  .chip{
+    background:var(--surface2); border:1px solid var(--line); color:var(--text);
+    padding:9px 13px; border-radius:999px; font-size:13.5px; cursor:pointer;
+    transition:.15s; user-select:none; white-space:nowrap;
+  }
+  .chip:active{transform:scale(.95)}
+  .chip.sel{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#1a0d05; font-weight:700}
+
+  .stepper{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px}
+  .stepper button{
+    width:44px; height:44px; border-radius:50%; background:var(--surface2);
+    color:var(--text); border:1px solid var(--line); font-size:22px; font-weight:600; cursor:pointer;
+  }
+  .stepper button:active{background:var(--accent); color:#1a0d05}
+  .stepper .val{font-size:26px; font-weight:700; font-variant-numeric:tabular-nums}
+  .stepper .unit{color:var(--muted); font-size:13px; margin-left:3px}
+  .unit-toggle{display:flex; gap:6px; margin-top:10px}
+  .unit-toggle button{flex:1; padding:8px; border-radius:9px; background:var(--surface2); border:1px solid var(--line); color:var(--muted); font-size:13px; cursor:pointer}
+  .unit-toggle button.sel{background:var(--text); color:var(--bg); font-weight:700; border-color:transparent}
+
+  .calc-btn{
+    width:100%; padding:16px; border:none; border-radius:16px; font-size:17px; font-weight:800;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#1a0d05;
+    cursor:pointer; letter-spacing:.3px; box-shadow:0 8px 24px -8px var(--accent);
+  }
+  .calc-btn:active{transform:translateY(1px) scale(.99)}
+
+  .result{display:none; margin-top:14px}
+  .result.show{display:block; animation:pop .35s cubic-bezier(.2,.9,.3,1.4)}
+  @keyframes pop{0%{opacity:0; transform:scale(.9) translateY(10px)}100%{opacity:1; transform:none}}
+  .time-box{text-align:center; padding:22px 12px; background:linear-gradient(160deg,rgba(255,90,31,.18),rgba(255,138,61,.05)); border:1px solid var(--line); border-radius:18px}
+  .time-box .big{font-size:58px; font-weight:800; letter-spacing:-2px; line-height:1; font-variant-numeric:tabular-nums; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .time-box .lbl{color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:1.5px; margin-top:6px}
+  .tip{display:flex; gap:10px; align-items:flex-start; padding:11px 12px; background:var(--surface2); border:1px solid var(--line); border-radius:12px; margin-top:9px; font-size:13px}
+  .tip .ico{font-size:16px; line-height:1.3}
+  .breakdown{font-size:12px; color:var(--muted); margin-top:11px; line-height:1.6}
+  .breakdown b{color:var(--text)}
+  .reheat-again{margin-top:10px; padding:12px; border-radius:12px; background:var(--surface2); border:1px solid var(--line); color:var(--muted); font-size:12.5px; text-align:center}
+
+  details.adv{margin-top:12px; border-top:1px solid var(--line); padding-top:11px}
+  details.adv summary{color:var(--muted); font-size:12.5px; cursor:pointer; list-style:none; outline:none}
+  details.adv summary::-webkit-details-marker{display:none}
+  details.adv summary::before{content:"⚙ "; filter:grayscale(1)}
+  .range-row{margin-top:10px}
+  .range-row label{display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:5px}
+  .range-row label b{color:var(--text)}
+  input[type=range]{width:100%; accent-color:var(--accent); height:26px}
+
+  footer{text-align:center; color:var(--muted); font-size:11px; margin-top:18px; line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <span class="logo">🔥</span>
+  <h1>MicroHeat</h1>
+  <p>Accurate microwave time · powered by real thermodynamics</p>
+</div>
+
+<!-- FOOD -->
+<div class="card">
+  <h2>What are you heating?</h2>
+  <div class="chip-row" id="foodRow"></div>
+</div>
+
+<!-- WEIGHT -->
+<div class="card">
+  <h2>How much?</h2>
+  <div class="stepper">
+    <button id="wMinus">−</button>
+    <div><span class="val" id="weightVal">250</span><span class="unit" id="weightUnit">g</span></div>
+    <button id="wPlus">+</button>
+  </div>
+  <div class="unit-toggle">
+    <button data-u="g" class="sel">grams</button>
+    <button data-u="oz">ounces</button>
+  </div>
+</div>
+
+<!-- START -->
+<div class="card">
+  <h2>Starting from…</h2>
+  <div class="chip-row" id="startRow"></div>
+</div>
+
+<!-- TARGET -->
+<div class="card">
+  <h2>Heat it to…</h2>
+  <div class="chip-row" id="targetRow"></div>
+</div>
+
+<!-- MICROWAVE -->
+<div class="card">
+  <h2>Your microwave</h2>
+  <div class="chip-row" id="powerRow"></div>
+  <details class="adv">
+    <summary>Tune accuracy (advanced)</summary>
+    <div class="range-row">
+      <label>Efficiency / power absorbed <b><span id="effVal">65</span>%</b></label>
+      <input type="range" id="effSlider" min="45" max="80" value="65" step="1">
+    </div>
+    <div class="range-row">
+      <label>Water content of food <b><span id="wcVal">65</span>%</b></label>
+      <input type="range" id="wcSlider" min="30" max="95" value="65" step="1">
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.5">
+      Most home microwaves deliver 60–70% of their rated wattage to the food. Lower it if yours runs weak, raise it if it's a powerful inverter model.
+    </p>
+  </details>
+</div>
+
+<button class="calc-btn" id="calcBtn">Calculate time →</button>
+
+<!-- RESULT -->
+<div class="result" id="result">
+  <div class="time-box">
+    <div class="big" id="timeBig">2:00</div>
+    <div class="lbl" id="timeLbl">on HIGH</div>
+  </div>
+  <div id="tips"></div>
+  <div class="breakdown" id="breakdown"></div>
+  <div class="reheat-again" id="reheatNote"></div>
+</div>
+
+<footer>
+  Estimates use Q = m·c·ΔT plus latent heat of fusion for frozen food.<br>
+  Microwaves heat unevenly — always verify temperature before eating.
+</footer>
+
+<script>
+/* ---------- DATA: real specific-heat values (kJ/kg·K) ---------- */
+const FOODS = [
+  {key:'beverage',  name:'☕ Beverage',    c:4.0, water:0.95},
+  {key:'soup',      name:'🍲 Soup/broth',  c:3.9, water:0.80},
+  {key:'veg',       name:'🥦 Vegetables',  c:3.9, water:0.75},
+  {key:'leftovers', name:'🍽️ Leftovers',   c:3.7, water:0.65, def:true},
+  {key:'rice',      name:'🍚 Rice/pasta',  c:3.5, water:0.60},
+  {key:'meat',      name:'🍗 Meat',        c:3.4, water:0.60},
+  {key:'frozendine',name:'🍱 Frozen meal', c:3.3, water:0.60},
+  {key:'bread',     name:'🍞 Bread/pizza', c:2.9, water:0.40},
+  {key:'cheese',    name:'🧀 Cheese/butter',c:2.5, water:0.40},
+];
+
+/* temperature presets (°C) */
+const STARTS = [
+  {key:'frozen', name:'❄️ Frozen',  t:-18},
+  {key:'fridge', name:'🧊 Fridge',   t:4,   def:true},
+  {key:'cool',   name:'🌡️ Cool',     t:12},
+  {key:'room',   name:'🏠 Room',     t:20},
+];
+const TARGETS = [
+  {key:'warm',   name:'🙂 Warm',     t:45},
+  {key:'hot',    name:'😋 Hot',      t:62,  def:true},
+  {key:'piping', name:'🔥 Piping',   t:75},
+  {key:'boil',   name:'💨 Near-boil',t:88},
+];
+const POWERS = [
+  {w:700},{w:800},{w:900},{w:1000,def:true},{w:1100},{w:1200},
+];
+
+/* ---------- STATE ---------- */
+let S = { food:'leftovers', weightG:250, unit:'g', start:'fridge', target:'hot', power:1000, eff:0.65, water:0.65 };
+
+/* ---------- BUILD UI ---------- */
+function buildChips(rowId, items, keyProp, onSelect, selKey){
+  const row = document.getElementById(rowId);
+  row.innerHTML='';
+  items.forEach(it=>{
+    const b=document.createElement('div');
+    b.className='chip'+((it.def||it.key===selKey)?' sel':'');
+    b.textContent=it.name || (it.w+'W');
+    const k = keyProp? it[keyProp] : it.key;
+    b.onclick=()=>{ row.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); onSelect(it); };
+    row.appendChild(b);
+  });
+}
+
+buildChips('foodRow',   FOODS,  'key',   it=>{S.food=it.key; S.water=it.water/100; document.getElementById('wcSlider').value=it.water*100; document.getElementById('wcVal').textContent=it.water;}, S.food);
+buildChips('startRow',  STARTS, 'key',   it=>S.start=it.key, S.start);
+buildChips('targetRow', TARGETS,'key',   it=>S.target=it.key, S.target);
+buildChips('powerRow',  POWERS, null,    it=>S.power=it.w,    S.power);
+
+/* weight steppers */
+const STEPS = { g:25, oz:1 };
+function fmtWeight(){ document.getElementById('weightVal').textContent=S.weightG; document.getElementById('weightUnit').textContent=S.unit; }
+function toG(v){ return S.unit==='oz'? v*28.3495 : v; }       // displayed value -> grams
+function fromG(g){ return S.unit==='oz'? Math.round(g/28.3495) : Math.round(g); }
+function setUnit(u){
+  const g = toG(S.weightG);   // store current as grams
+  S.unit=u;
+  S.weightG = fromG(g);
+  fmtWeight();
+}
+// internal storage stays in grams; weightG holds the displayed number
+document.getElementById('wMinus').onclick=()=>{ S.weightG=Math.max(1,S.weightG-STEPS[S.unit]); fmtWeight(); };
+document.getElementById('wPlus').onclick =()=>{ S.weightG=S.weightG+STEPS[S.unit]; fmtWeight(); };
+document.querySelectorAll('.unit-toggle button').forEach(b=>{
+  b.onclick=()=>{ document.querySelectorAll('.unit-toggle button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); setUnit(b.dataset.u); };
+});
+
+/* sliders */
+document.getElementById('effSlider').oninput=e=>{S.eff=e.target.value/100; document.getElementById('effVal').textContent=e.target.value;};
+document.getElementById('wcSlider').oninput =e=>{S.water=e.target.value/100; document.getElementById('wcVal').textContent=e.target.value;};
+
+/* ---------- PHYSICS ---------- */
+const find=(arr,k)=>arr.find(x=>(x.key||x.w)==k || x.key===k);
+const LATENT = 334000;   // J/kg  (energy to melt ice)
+const C_FROZEN = 2000;   // J/kg·K specific heat while still frozen
+
+function calc(){
+  const food   = FOODS.find(f=>f.key===S.food);
+  const start  = STARTS.find(s=>s.key===S.start);
+  const target = TARGETS.find(t=>t.key===S.target);
+  const cFood  = food.c*1000;            // J/kg·K
+  const m      = toG(S.weightG)/1000;    // kg
+  const Tin    = start.t;
+  const Tout   = target.t;
+  const Pabs   = S.power*S.eff;          // watts actually absorbed
+  const waterFrac = S.water;
+
+  let energy=0, parts=[];
+
+  // Phase 1: warming while still frozen (from Tin up to 0°C), if frozen
+  if(Tin < 0){
+    const dT = 0 - Tin;
+    const q = m*C_FROZEN*dT;
+    energy += q;
+    parts.push(`Warming frozen food ${dT}°: <b>${Math.round(q)} J</b>`);
+  } else if (Tin < Tout){
+    // already liquid, simple warming handled in phase 3
+  }
+
+  // Phase 2: thawing (latent heat) — only if it started frozen
+  if(Tin < 0){
+    const q = m*waterFrac*LATENT;
+    energy += q;
+    parts.push(`Thawing the ice (latent heat): <b>${Math.round(q)} J</b>`);
+  }
+
+  // Phase 3: warming from 0°C (or Tin if not frozen) to target
+  const warmStart = Tin < 0 ? 0 : Tin;
+  if(Tout > warmStart){
+    const dT = Tout - warmStart;
+    const q = m*cFood*dT;
+    energy += q;
+    parts.push(`Heating ${dT}° to ${Tout}°C: <b>${Math.round(q)} J</b>`);
+  }
+
+  let seconds = energy / Pabs;
+  // real-world cushion: microwaves are uneven, add small margin
+  const secondsFinal = seconds * 1.05;
+
+  return { seconds:Math.round(secondsFinal), raw:seconds, energy, parts, food, start, target, m, Tin, Tout, Pabs };
+}
+
+/* ---------- RENDER RESULT ---------- */
+function fmtTime(sec){
+  if(sec<60) return {text:String(sec), unit:'sec', big:sec+'s'};
+  const m=Math.floor(sec/60), s=sec%60;
+  return {unit:'min', big:m+':'+String(s).padStart(2,'0'), text:m+' min'+(s?' '+s+'s':'')};
+}
+
+document.getElementById('calcBtn').onclick=()=>{
+  const r = calc();
+  const t = fmtTime(r.seconds);
+  document.getElementById('timeBig').textContent = t.big;
+  document.getElementById('timeLbl').textContent = `on HIGH · ${S.power}W · ~${Math.round(r.energy/1000)} kJ needed`;
+
+  /* tips */
+  const tips=[];
+  const isFrozen = r.Tin<0;
+  if(isFrozen) tips.push({i:'❄️', t:'It started frozen — most of the time is just thawing the ice, not raising temperature. That extra time is normal.'});
+  if(r.seconds>120) tips.push({i:'🔁', t:'Stir or flip halfway through. Microwaves heat unevenly — cold spots hide inside.'});
+  if(r.food.key==='beverage'||r.food.key==='soup') tips.push({i:'♨️', t:'Liquids can superheat and erupt. Put a wooden stirrer in and wait 20 sec after.'});
+  if(r.Tout>=75) tips.push({i:'🧯', t:'Piping hot — let it stand 1 min. It keeps cooking from its own heat.'});
+  if(r.food.key==='meat') tips.push({i:'🌡️', t:'For meat, verify the centre hits 74°C (165°F) to be safe.'});
+  if(tips.length===0) tips.push({i:'👍', t:'Short heat — give it a quick stir and check the temp.'});
+  document.getElementById('tips').innerHTML = tips.map(x=>`<div class="tip"><span class="ico">${x.i}</span><span>${x.t}</span></div>`).join('');
+
+  /* breakdown */
+  document.getElementById('breakdown').innerHTML =
+    `<b>${(r.m*1000).toFixed(0)} g</b> ${r.food.name} · c=${r.food.c} kJ/kg·K<br>`+
+    parts2html(r.parts)+
+    `<br>Absorbed power ≈ ${Math.round(r.Pabs)} W (${S.power}W × ${Math.round(S.eff*100)}%)<br>`+
+    `<b>→ ${Math.round(r.raw)} s</b> (small margin added for uneven heating)`;
+
+  /* reheat suggestion */
+  const note = isFrozen
+    ? 'Still cold in the middle? Add 30–40% more time — frozen centres lag far behind the edges.'
+    : 'Not hot enough yet? Add ~20 sec and check again.';
+  document.getElementById('reheatNote').textContent = note;
+
+  const res=document.getElementById('result');
+  res.classList.remove('show'); void res.offsetWidth; res.classList.add('show');
+  res.scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+function parts2html(p){ return p.join('<br>'); }
+</script>
+</body>
+</html>
